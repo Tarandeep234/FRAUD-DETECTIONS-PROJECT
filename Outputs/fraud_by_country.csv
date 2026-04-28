@@ -1,0 +1,6 @@
+country,total_transactions,fraud_transactions,fraud_rate
+Canada,305,25,0.082
+US,376,25,0.0665
+Germany,388,25,0.0644
+India,424,22,0.0519
+UK,507,26,0.0513

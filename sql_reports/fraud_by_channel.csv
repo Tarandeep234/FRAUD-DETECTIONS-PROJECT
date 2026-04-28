@@ -1,0 +1,4 @@
+channel,total_transactions,fraud_transactions,fraud_rate
+transfer,681,59,0.0866
+online,743,64,0.0861
+card_present,576,0,0.0
