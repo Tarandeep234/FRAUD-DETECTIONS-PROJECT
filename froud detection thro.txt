@@ -1,0 +1,379 @@
+Raw Data (CSV)
+   ↓
+Unix Validation Script
+   ↓
+Python Feature Engineering
+   ↓
+Azure Blob Storage (processed layer)
+   ↓
+Azure SQL Database
+   ↓
+ML Model (Fraud Detection)
+   ↓
+Predictions + Risk Scores
+   ↓
+SQL Analytics + Reports
+
+
+
+Phase 1 — Structure + Data (today)
+Phase 2 — Validation (Unix + Python)
+Phase 3 — Feature Engineering
+Phase 4 — ML Model
+Phase 5 — Azure + SQL integration
+Phase 6 — Automation (Unix pipeline)
+Phase 7 — Final outputs + GitHub
+
+
+Understand the business problem
+
+Your project needs a real business problem.
+
+Business problem
+
+A financial company wants to identify suspicious transactions and detect fraud risk using customer, merchant, and transaction data.
+
+That is your business case.
+
+What your project will answer
+
+Your system should answer questions like:
+
+which transactions are likely fraudulent?
+which customers are high risk?
+which merchants are linked to suspicious activity?
+which channels or locations have more fraud?
+
+. Looks professional in interview 💼
+
+You can say:
+
+I designed and generated a synthetic fraud dataset to simulate real-world transaction behavior and build a scalable fraud detection system.
+
+
+step one - we need to create structured folders 
+step 2- create the datasets properly
+ we need three csv files transactions.csv,customers.csv,merchants.csv
+
+WHAT THESE FILES ARE FOR -1) THIS IS THE MAIN FRAUD DATASET WITH EXACT COLUMNS transaction_id,customer_id,merchant_id,transaction_time,amount,device_type,channel,location,is_fraud
+
+Meaning
+transaction_id → unique transaction number
+customer_id → links to customer
+merchant_id → links to merchant
+transaction_time → date/time of purchase
+amount → value of transaction
+device_type → mobile/web/atm/pos
+channel → online/card_present/transfer
+location → city or region
+is_fraud → 1 if fraud, 0 if not
+
+2. customers.csv
+
+This gives customer background.
+
+Columns
+customer_id,age,country,account_age_days,customer_segment
+Meaning
+customer_id → customer identifier
+age → customer age
+country → country
+account_age_days → how old the account is
+customer_segment → standard/premium/business
+
+
+
+3. merchants.csv
+
+This gives merchant background.
+
+Columns
+merchant_id,merchant_category,merchant_country
+Meaning
+merchant_id → merchant identifier
+merchant_category → electronics/travel/grocery/etc.
+merchant_country → country
+
+Step 2A — Create generate_data.py
+
+Open:
+
+scripts/generate_data.py
+
+
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+
+np.random.seed(42)
+
+# -----------------------------
+# Generate customers
+# -----------------------------
+num_customers = 200
+customers = pd.DataFrame({
+    "customer_id": [f"CUST{i:04d}" for i in range(1, num_customers + 1)],
+    "age": np.random.randint(18, 70, num_customers),
+    "country": np.random.choice(["UK", "US", "India", "Germany", "Canada"], num_customers),
+    "account_age_days": np.random.randint(30, 3000, num_customers),
+    "customer_segment": np.random.choice(["standard", "premium", "business"], num_customers)
+})
+
+# -----------------------------
+# Generate merchants
+# -----------------------------
+num_merchants = 50
+merchants = pd.DataFrame({
+    "merchant_id": [f"MER{i:03d}" for i in range(1, num_merchants + 1)],
+    "merchant_category": np.random.choice(
+        ["electronics", "travel", "grocery", "fashion", "gaming", "utilities"],
+        num_merchants
+    ),
+    "merchant_country": np.random.choice(["UK", "US", "India", "Germany", "Canada"], num_merchants)
+})
+
+# -----------------------------
+# Generate transactions
+# -----------------------------
+num_transactions = 2000
+start_date = datetime(2025, 1, 1)
+
+transaction_times = [
+    start_date + timedelta(minutes=int(np.random.randint(0, 60 * 24 * 180)))
+    for _ in range(num_transactions)
+]
+
+transactions = pd.DataFrame({
+    "transaction_id": [f"TXN{i:06d}" for i in range(1, num_transactions + 1)],
+    "customer_id": np.random.choice(customers["customer_id"], num_transactions),
+    "merchant_id": np.random.choice(merchants["merchant_id"], num_transactions),
+    "transaction_time": transaction_times,
+    "amount": np.round(np.random.exponential(scale=120, size=num_transactions), 2),
+    "device_type": np.random.choice(["mobile", "web", "atm", "pos"], num_transactions),
+    "channel": np.random.choice(["online", "card_present", "transfer"], num_transactions),
+    "location": np.random.choice(["London", "Manchester", "Birmingham", "Leeds", "Glasgow"], num_transactions),
+    "is_fraud": np.random.choice([0, 1], num_transactions, p=[0.94, 0.06])
+})
+
+# Add a few suspicious patterns to make the dataset more realistic
+fraud_indices = transactions[transactions["is_fraud"] == 1].index
+
+transactions.loc[fraud_indices, "amount"] = np.round(
+    transactions.loc[fraud_indices, "amount"] * np.random.uniform(2.0, 5.0, len(fraud_indices)), 2
+)
+transactions.loc[fraud_indices, "channel"] = np.random.choice(["online", "transfer"], len(fraud_indices))
+transactions.loc[fraud_indices, "device_type"] = np.random.choice(["mobile", "web"], len(fraud_indices))
+
+# -----------------------------
+# Save files
+# -----------------------------
+customers.to_csv("data/raw/customers.csv", index=False)
+merchants.to_csv("data/raw/merchants.csv", index=False)
+transactions.to_csv("data/raw/transactions.csv", index=False)
+
+print("Raw datasets created successfully!")
+print("Customers shape:", customers.shape)
+print("Merchants shape:", merchants.shape)
+print("Transactions shape:", transactions.shape)
+
+
+ EXPLANATION OF THIS CODE 
+
+
+
+
+
+Step 3 — Validation Layer
+
+This is a very important step.
+
+Most beginners skip this and jump straight into ML.
+Real companies do not.
+
+They first ask:
+
+Is the data complete?
+Are IDs valid?
+Are there duplicates?
+Are amounts reasonable?
+Are dates valid?
+
+That is exactly what you will do now.
+
+STEP 3A — Open the validation file
+
+Open:
+
+scripts/validate_data.py
+STEP 3B — Paste this code
+
+Paste this full code exactly:
+
+
+
+
+import pandas as pd
+
+# -----------------------------
+# Load raw datasets
+# -----------------------------
+customers = pd.read_csv("data/raw/customers.csv")
+merchants = pd.read_csv("data/raw/merchants.csv")
+transactions = pd.read_csv("data/raw/transactions.csv")
+
+print("Datasets loaded successfully.")
+print("Customers:", customers.shape)
+print("Merchants:", merchants.shape)
+print("Transactions:", transactions.shape)
+
+# -----------------------------
+# CUSTOMER VALIDATION
+# -----------------------------
+print("\n--- CUSTOMER VALIDATION ---")
+
+print("Missing values in customers:")
+print(customers.isnull().sum())
+
+print("\nDuplicate customer_id count:")
+print(customers["customer_id"].duplicated().sum())
+
+# Remove duplicate customer IDs if any
+customers = customers.drop_duplicates(subset=["customer_id"])
+
+# Filter invalid ages
+customers = customers[(customers["age"] >= 18) & (customers["age"] <= 100)]
+
+# Filter invalid account age
+customers = customers[customers["account_age_days"] >= 0]
+
+print("Validated customers shape:", customers.shape)
+
+# -----------------------------
+# MERCHANT VALIDATION
+# -----------------------------
+print("\n--- MERCHANT VALIDATION ---")
+
+print("Missing values in merchants:")
+print(merchants.isnull().sum())
+
+print("\nDuplicate merchant_id count:")
+print(merchants["merchant_id"].duplicated().sum())
+
+# Remove duplicate merchant IDs if any
+merchants = merchants.drop_duplicates(subset=["merchant_id"])
+
+print("Validated merchants shape:", merchants.shape)
+
+# -----------------------------
+# TRANSACTION VALIDATION
+# -----------------------------
+print("\n--- TRANSACTION VALIDATION ---")
+
+print("Missing values in transactions:")
+print(transactions.isnull().sum())
+
+print("\nDuplicate transaction_id count:")
+print(transactions["transaction_id"].duplicated().sum())
+
+# Remove duplicate transactions
+transactions = transactions.drop_duplicates(subset=["transaction_id"])
+
+# Remove invalid amounts
+transactions = transactions[transactions["amount"] > 0]
+
+# Keep only valid fraud labels
+transactions = transactions[transactions["is_fraud"].isin([0, 1])]
+
+# Convert transaction_time to datetime
+transactions["transaction_time"] = pd.to_datetime(
+    transactions["transaction_time"],
+    errors="coerce"
+)
+
+# Remove rows where transaction_time could not be parsed
+transactions = transactions.dropna(subset=["transaction_time"])
+
+# Check valid customer and merchant references
+transactions = transactions[
+    transactions["customer_id"].isin(customers["customer_id"])
+]
+
+transactions = transactions[
+    transactions["merchant_id"].isin(merchants["merchant_id"])
+]
+
+print("Validated transactions shape:", transactions.shape)
+
+# -----------------------------
+# Save validated datasets
+# -----------------------------
+customers.to_csv("data/validated/customers_validated.csv", index=False)
+merchants.to_csv("data/validated/merchants_validated.csv", index=False)
+transactions.to_csv("data/validated/transactions_validated.csv", index=False)
+
+print("\nValidated datasets saved successfully!")
+
+
+STEP 3C — Save the file
+
+Press:
+
+Ctrl + S
+STEP 3D — Run the script
+
+In terminal, run:
+
+python scripts/validate_data.py
+What should happen
+
+You should see output like:
+
+datasets loaded successfully
+missing value counts
+duplicate counts
+final validated shapes
+“validated datasets saved successfully”
+
+
+
+
+What this script is doing, line by line conceptually
+
+Let me explain it clearly.
+
+Part 1 — Load the raw datasets
+customers = pd.read_csv(...)
+merchants = pd.read_csv(...)
+transactions = pd.read_csv(...)
+
+This reads the three raw files you created.
+
+Part 2 — Customer validation
+
+We check:
+
+Missing values
+customers.isnull().sum()
+
+Duplicate customer IDs
+customers["customer_id"].duplicated().sum()
+
+A customer ID should be unique.
+
+Age filtering
+customers[(customers["age"] >= 18) & (customers["age"] <= 100)]
+
+This removes unrealistic ages.
+
+Account age filtering
+customers["account_age_days"] >= 0
+
+Account age cannot be negative.
+
+
+
+
+
+
+
+
